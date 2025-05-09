@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Werkzeugverwaltung App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    header { margin-bottom: 20px; }
+    nav button { margin-right: 10px; }
+    .hidden { display: none; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+    table, th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background-color: #f4f4f4; }
+    .error { color: red; }
+    .success { color: green; }
+    textarea { resize: vertical; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Login-Ansicht -->
+    <div id="login-view">
+      <h2>Login</h2>
+      <form id="login-form">
+        <label for="username">Benutzername:</label>
+        <input type="text" id="username" required><br><br>
+        <label for="password">Passwort:</label>
+        <input type="password" id="password" required><br><br>
+        <button type="submit">Login</button>
+      </form>
+      <div id="login-error" class="error"></div>
+    </div>
+
+    <!-- Hauptansicht nach dem Login -->
+    <div id="main-view" class="hidden">
+      <header>
+        <h1>Werkzeugverwaltung</h1>
+        <nav>
+          <button id="nav-ausleihen">Meine Ausleihen</button>
+          <button id="nav-ausleihen-form">Werkzeug ausleihen</button>
+          <span id="admin-nav" class="hidden">
+            <button id="nav-admin">Admin Dashboard</button>
+          </span>
+          <button id="logout-button">Logout</button>
+        </nav>
+        <hr>
+      </header>
+      <main id="content"></main>
+    </div>
+  </div>
+
+  <script>
+    // Standardwerkzeuge, falls noch nicht vorhanden
+    const defaultTools = [
+      { id: 1, name: "Hammer", description: "Ein robuster Hammer" },
+      { id: 2, name: "Schraubenzieher", description: "Kreuzschlitz Schraubenzieher" },
+      { id: 3, name: "Zange", description: "Seitenschneider-Zange" }
+    ];
+
+    const STORAGE_KEYS = {
+      tools: "tools",
+      borrowings: "borrowings",
+      currentUser: "currentUser"
+    };
+
+    // Initialisiere Daten, falls noch nicht vorhanden
+    function initData() {
+      if (!localStorage.getItem(STORAGE_KEYS.tools)) {
+        localStorage.setItem(STORAGE_KEYS.tools, JSON.stringify(defaultTools));
+      }
+      if (!localStorage.getItem(STORAGE_KEYS.borrowings)) {
+        localStorage.setItem(STORAGE_KEYS.borrowings, JSON.stringify([]));
+      }
+    }
+    initData();
+
+    // Globaler Status: aktueller Benutzer (Objekt mit username und role)
+    let currentUser = null;
+
+    // Login-Formular
+    const loginForm = document.getElementById("login-form");
+    loginForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+
+      // Simpler Check:
+      // Admin: username "admin" und Passwort "admin"
+      if(username === "admin" && password === "admin") {
+        currentUser = { username: username, role: "admin" };
+        localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(currentUser));
+        showMainView();
+        showMessage("Erfolgreich als Administrator angemeldet.", "success");
+        return;
+      }
+      // Jeder andere Benutzer wird als Mitarbeiter geführt
+      if(username !== "" && password !== ""){
+        currentUser = { username: username, role: "employee" };
+        localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(currentUser));
+        showMainView();
+        showMessage("Erfolgreich als Mitarbeiter angemeldet.", "success");
+        return;
+      }
+      document.getElementById("login-error").textContent = "Ungültige Anmeldedaten.";
+    });
+
+    // Zeige die Hauptansicht (nach Login)
+    function showMainView() {
+      document.getElementById("login-view").classList.add("hidden");
+      document.getElementById("main-view").classList.remove("hidden");
+      // Admin-Button nur anzeigen, wenn Administrator
+      if(currentUser.role === "admin"){
+        document.getElementById("admin-nav").classList.remove("hidden");
+      } else {
+        document.getElementById("admin-nav").classList.add("hidden");
+      }
+      showBorrowings();
+    }
+
+    // Logout-Funktion
+    function logout() {
+      currentUser = null;
+      localStorage.removeItem(STORAGE_KEYS.currentUser);
+      document.getElementById("main-view").classList.add("hidden");
+      document.getElementById("login-view").classList.remove("hidden");
+      loginForm.reset();
+      document.getElementById("login-error").textContent = "";
+    }
+    document.getElementById("logout-button").addEventListener("click", logout);
+
+    // Anzeige von Meldungen
+    function showMessage(message, type="info") {
+      const msgDiv = document.createElement("div");
+      msgDiv.textContent = message;
+      msgDiv.className = type;
+      document.getElementById("content").prepend(msgDiv);
+      setTimeout(() => { msgDiv.remove(); }, 3000);
+    }
+
+    // Navigation
+    document.getElementById("nav-ausleihen").addEventListener("click", showBorrowings);
+    document.getElementById("nav-ausleihen-form").addEventListener("click", showBorrowToolForm);
+    document.getElementById("nav-admin").addEventListener("click", showAdminDashboard);
+
+    // Ansicht: Liste der Ausleihen (für Mitarbeiter bzw. Admin)
+    function showBorrowings() {
+      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
+      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
+      let filtered;
+      if(currentUser.role === "admin"){
+        filtered = borrowings;
+      } else {
+        filtered = borrowings.filter(b => b.employee === currentUser.username);
+      }
+      let html = "<h2>Ausleihen</h2>";
+      if(filtered.length === 0){
+        html += "<p>Keine Ausleihen gefunden.</p>";
+      } else {
+        html += "<table><tr><th>ID</th><th>Werkzeug</th><th>Mitarbeiter</th><th>Ausleihdatum</th><th>Rückgabedatum</th><th>Defekt</th><th>Aktion</th></tr>";
+        filtered.forEach(b => {
+          const tool = tools.find(t => t.id === b.toolId);
+          html += `<tr>
+                     <td>${b.id}</td>
+                     <td>${tool ? tool.name : "Unbekannt"}</td>
+                     <td>${b.employee}</td>
+                     <td>${new Date(b.borrowDate).toLocaleString()}</td>
+                     <td>${b.returnDate ? new Date(b.returnDate).toLocaleString() : "-"}</td>
+                     <td>${b.defectReport ? b.defectReport : "-"}</td>
+                     <td>`;
+          if(!b.returnDate && (currentUser.role === "admin" || b.employee === currentUser.username)){
+            html += `<button onclick="returnTool(${b.id})">Zurückgeben</button>`;
+          }
+          html += `</td></tr>`;
+        });
+        html += "</table>";
+      }
+      document.getElementById("content").innerHTML = html;
+    }
+
+    // Ansicht: Formular zum Ausleihen eines Werkzeugs
+    function showBorrowToolForm() {
+      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
+      if(tools.length === 0){
+        document.getElementById("content").innerHTML = "<p>Keine Werkzeuge verfügbar.</p>";
+        return;
+      }
+      let html = `<h2>Werkzeug ausleihen</h2>
+                  <form id="borrow-form">
+                    <label for="tool-select">Werkzeug:</label>
+                    <select id="tool-select">`;
+      tools.forEach(tool => {
+        html += `<option value="${tool.id}">${tool.name} - ${tool.description}</option>`;
+      });
+      html += `</select><br><br>
+               <label for="defect">Defekt (optional):</label>
+               <textarea id="defect" rows="3"></textarea><br><br>
+               <button type="submit">Ausleihen</button>
+               </form>
+               <div id="form-msg"></div>`;
+      document.getElementById("content").innerHTML = html;
+
+      document.getElementById("borrow-form").addEventListener("submit", function(e) {
+        e.preventDefault();
+        const selectedToolId = parseInt(document.getElementById("tool-select").value);
+        const defect = document.getElementById("defect").value.trim();
+        borrowTool(selectedToolId, defect);
+      });
+    }
+
+    // Werkzeug ausleihen
+    function borrowTool(toolId, defect) {
+      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
+      const newId = borrowings.length > 0 ? Math.max(...borrowings.map(b => b.id)) + 1 : 1;
+      const newBorrowing = {
+        id: newId,
+        toolId: toolId,
+        employee: currentUser.username,
+        borrowDate: new Date().toISOString(),
+        returnDate: null,
+        defectReport: defect
+      };
+      borrowings.push(newBorrowing);
+      localStorage.setItem(STORAGE_KEYS.borrowings, JSON.stringify(borrowings));
+      showMessage("Werkzeug erfolgreich ausgeliehen.", "success");
+      showBorrowings();
+    }
+
+    // Werkzeug zurückgeben
+    function returnTool(borrowingId) {
+      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
+      const borrowing = borrowings.find(b => b.id === borrowingId);
+      if(borrowing && !borrowing.returnDate){
+        borrowing.returnDate = new Date().toISOString();
+        localStorage.setItem(STORAGE_KEYS.borrowings, JSON.stringify(borrowings));
+        showMessage("Werkzeug zurückgegeben.", "success");
+        showBorrowings();
+      }
+    }
+
+    // Ansicht: Admin Dashboard
+    function showAdminDashboard() {
+      let html = `<h2>Admin Dashboard</h2>
+        <h3>Werkzeuge verwalten</h3>
+        <div id="tool-management">
+          <form id="add-tool-form">
+            <label for="tool-name">Name:</label>
+            <input type="text" id="tool-name" required>
+            <label for="tool-desc">Beschreibung:</label>
+            <input type="text" id="tool-desc">
+            <button type="submit">Hinzufügen</button>
+          </form>
+          <div id="tool-msg"></div>
+        </div>
+        <div id="tool-list"></div>
+        <h3>Alle Ausleihen</h3>
+        <div id="admin-borrowings"></div>`;
+      document.getElementById("content").innerHTML = html;
+      renderToolList();
+
+      document.getElementById("add-tool-form").addEventListener("submit", function(e){
+        e.preventDefault();
+        const name = document.getElementById("tool-name").value.trim();
+        const desc = document.getElementById("tool-desc").value.trim();
+        addTool(name, desc);
+      });
+      renderAdminBorrowings();
+    }
+
+    function renderToolList() {
+      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
+      let html = "<table><tr><th>ID</th><th>Name</th><th>Beschreibung</th><th>Aktion</th></tr>";
+      tools.forEach(tool => {
+        html += `<tr>
+                   <td>${tool.id}</td>
+                   <td>${tool.name}</td>
+                   <td>${tool.description}</td>
+                   <td><button onclick="removeTool(${tool.id})">Entfernen</button></td>
+                 </tr>`;
+      });
+      html += "</table>";
+      document.getElementById("tool-list").innerHTML = html;
+    }
+
+    function addTool(name, description) {
+      if(name === "") return;
+      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
+      const newId = tools.length > 0 ? Math.max(...tools.map(t => t.id)) + 1 : 1;
+      const newTool = { id: newId, name: name, description: description };
+      tools.push(newTool);
+      localStorage.setItem(STORAGE_KEYS.tools, JSON.stringify(tools));
+      document.getElementById("tool-msg").textContent = "Werkzeug hinzugefügt.";
+      renderToolList();
+    }
+
+    function removeTool(id) {
+      let tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
+      tools = tools.filter(t => t.id !== id);
+      localStorage.setItem(STORAGE_KEYS.tools, JSON.stringify(tools));
+      renderToolList();
+      showMessage("Werkzeug entfernt.", "success");
+    }
+
+    function renderAdminBorrowings() {
+      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
+      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
+      if(borrowings.length === 0){
+        document.getElementById("admin-borrowings").innerHTML = "<p>Keine Ausleihen vorhanden.</p>";
+        return;
+      }
+      let html = "<table><tr><th>ID</th><th>Werkzeug</th><th>Mitarbeiter</th><th>Ausleihdatum</th><th>Rückgabedatum</th><th>Defekt</th></tr>";
+      borrowings.forEach(b => {
+        const tool = tools.find(t => t.id === b.toolId);
+        html += `<tr>
+                  <td>${b.id}</td>
+                  <td>${tool ? tool.name : "Unbekannt"}</td>
+                  <td>${b.employee}</td>
+                  <td>${new Date(b.borrowDate).toLocaleString()}</td>
+                  <td>${b.returnDate ? new Date(b.returnDate).toLocaleString() : "-"}</td>
+                  <td>${b.defectReport ? b.defectReport : "-"}</td>
+                </tr>`;
+      });
+      html += "</table>";
+      document.getElementById("admin-borrowings").innerHTML = html;
+    }
+
+    // Prüfe beim Laden, ob bereits ein Benutzer angemeldet ist
+    window.onload = function() {
+      const savedUser = localStorage.getItem(STORAGE_KEYS.currentUser);
+      if(savedUser){
+        currentUser = JSON.parse(savedUser);
+        showMainView();
+      }
+    }
+  </script>
+</body>
+</html>
