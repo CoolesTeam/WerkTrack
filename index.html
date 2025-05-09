@@ -274,7 +274,12 @@
       let tools = JSON.parse(localStorage.getItem(STORAGE.tools)) || [];
       let html = '<h2>Werkzeugverwaltung</h2>';
       html += `<form id="add-tool" enctype="multipart/form-data">
-        <label>Nummer: <input type="number" id="tool-number" required></label><br><br>
+        <label>Nummer:
+          <input type="text" id="tool-number"
+                 required maxlength="20"
+                 pattern="[A-Za-z0-9]{1,20}"
+                 title="Bis zu 20 Zeichen, Buchstaben und Zahlen erlaubt">
+        </label><br><br>
         <label>Name:   <input type="text"   id="tool-name"   required></label><br><br>
         <label>Beschreibung: <input type="text" id="tool-desc"></label><br><br>
         <label>Bild (optional): <input type="file" id="tool-image" accept="image/*"></label><br><br>
