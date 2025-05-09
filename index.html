@@ -14,35 +14,46 @@
     th { background-color: #f4f4f4; }
     .error { color: red; }
     .success { color: green; }
-    textarea { resize: vertical; }
+    textarea, input[type="text"], input[type="password"] { width: 100%; padding: 6px; }
+    img.tool-img { max-width: 60px; height: auto; }
   </style>
 </head>
 <body>
   <div id="app">
-    <!-- Login-Ansicht -->
-    <div id="login-view">
+    <!-- Login/Register Views -->
+    <div id="auth-view">
       <h2>Login</h2>
       <form id="login-form">
-        <label for="username">Benutzername:</label>
-        <input type="text" id="username" required><br><br>
-        <label for="password">Passwort:</label>
-        <input type="password" id="password" required><br><br>
+        <label for="login-username">Benutzername:</label>
+        <input type="text" id="login-username" required>
+        <label for="login-password">Passwort:</label>
+        <input type="password" id="login-password" required>
         <button type="submit">Login</button>
       </form>
+      <p>Noch keinen Account? <button id="show-register">Registrieren</button></p>
       <div id="login-error" class="error"></div>
+      <div id="register-view" class="hidden">
+        <h2>Registrieren</h2>
+        <form id="register-form">
+          <label for="reg-username">Benutzername:</label>
+          <input type="text" id="reg-username" required>
+          <label for="reg-password">Passwort:</label>
+          <input type="password" id="reg-password" required>
+          <button type="submit">Registrieren</button>
+        </form>
+        <div id="register-error" class="error"></div>
+      </div>
     </div>
 
-    <!-- Hauptansicht nach dem Login -->
+    <!-- Main App View -->
     <div id="main-view" class="hidden">
       <header>
         <h1>Werkzeugverwaltung</h1>
         <nav>
-          <button id="nav-ausleihen">Meine Ausleihen</button>
-          <button id="nav-ausleihen-form">Werkzeug ausleihen</button>
-          <span id="admin-nav" class="hidden">
-            <button id="nav-admin">Admin Dashboard</button>
-          </span>
-          <button id="logout-button">Logout</button>
+          <button id="nav-list">Meine Ausleihen</button>
+          <button id="nav-borrow">Ausleihen</button>
+          <button id="nav-tools" class="hidden">Werkzeuge</button>
+          <button id="logout">Logout</button>
         </nav>
         <hr>
       </header>
@@ -51,286 +62,193 @@
   </div>
 
   <script>
-    // Standardwerkzeuge, falls noch nicht vorhanden
-    const defaultTools = [
-      { id: 1, name: "Hammer", description: "Ein robuster Hammer" },
-      { id: 2, name: "Schraubenzieher", description: "Kreuzschlitz Schraubenzieher" },
-      { id: 3, name: "Zange", description: "Seitenschneider-Zange" }
-    ];
-
-    const STORAGE_KEYS = {
-      tools: "tools",
-      borrowings: "borrowings",
-      currentUser: "currentUser"
+    const STORAGE = {
+      users: 'wm_users',
+      tools: 'wm_tools',
+      borrowings: 'wm_borrowings',
+      current: 'wm_current'
     };
 
-    // Initialisiere Daten, falls noch nicht vorhanden
-    function initData() {
-      if (!localStorage.getItem(STORAGE_KEYS.tools)) {
-        localStorage.setItem(STORAGE_KEYS.tools, JSON.stringify(defaultTools));
+    // Default admin user and sample tools
+    function initStorage() {
+      if (!localStorage.getItem(STORAGE.users)) {
+        const admin = { username: 'admin', password: 'admin', role: 'admin' };
+        localStorage.setItem(STORAGE.users, JSON.stringify([admin]));
       }
-      if (!localStorage.getItem(STORAGE_KEYS.borrowings)) {
-        localStorage.setItem(STORAGE_KEYS.borrowings, JSON.stringify([]));
+      if (!localStorage.getItem(STORAGE.tools)) {
+        const sample = [
+          { id:1, name:'Hammer', description:'Robuster Hammer', image:'' },
+          { id:2, name:'Schraubenzieher', description:'Kreuzschlitz', image:'' },
+          { id:3, name:'Zange', description:'Seitenschneider', image:'' }
+        ];
+        localStorage.setItem(STORAGE.tools, JSON.stringify(sample));
+      }
+      if (!localStorage.getItem(STORAGE.borrowings)) {
+        localStorage.setItem(STORAGE.borrowings, JSON.stringify([]));
       }
     }
-    initData();
+    initStorage();
 
-    // Globaler Status: aktueller Benutzer (Objekt mit username und role)
     let currentUser = null;
 
-    // Login-Formular
-    const loginForm = document.getElementById("login-form");
-    loginForm.addEventListener("submit", function(e) {
+    // Helper: show/hide
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+
+    // Auth views
+    const authView = document.getElementById('auth-view');
+    const loginForm = document.getElementById('login-form');
+    const regBtn = document.getElementById('show-register');
+    const regView = document.getElementById('register-view');
+    const registerForm = document.getElementById('register-form');
+    const loginError = document.getElementById('login-error');
+    const registerError = document.getElementById('register-error');
+
+    regBtn.onclick = () => { hide(loginForm); show(regView); };
+
+    loginForm.onsubmit = e => {
       e.preventDefault();
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
-
-      // Simpler Check:
-      // Admin: username "admin" und Passwort "admin"
-      if(username === "admin" && password === "admin") {
-        currentUser = { username: username, role: "admin" };
-        localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(currentUser));
-        showMainView();
-        showMessage("Erfolgreich als Administrator angemeldet.", "success");
-        return;
-      }
-      // Jeder andere Benutzer wird als Mitarbeiter geführt
-      if(username !== "" && password !== ""){
-        currentUser = { username: username, role: "employee" };
-        localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(currentUser));
-        showMainView();
-        showMessage("Erfolgreich als Mitarbeiter angemeldet.", "success");
-        return;
-      }
-      document.getElementById("login-error").textContent = "Ungültige Anmeldedaten.";
-    });
-
-    // Zeige die Hauptansicht (nach Login)
-    function showMainView() {
-      document.getElementById("login-view").classList.add("hidden");
-      document.getElementById("main-view").classList.remove("hidden");
-      // Admin-Button nur anzeigen, wenn Administrator
-      if(currentUser.role === "admin"){
-        document.getElementById("admin-nav").classList.remove("hidden");
+      const u = document.getElementById('login-username').value.trim();
+      const p = document.getElementById('login-password').value;
+      const users = JSON.parse(localStorage.getItem(STORAGE.users));
+      const user = users.find(x=>x.username===u && x.password===p);
+      if(user) {
+        currentUser = user;
+        localStorage.setItem(STORAGE.current, JSON.stringify(user));
+        startApp();
       } else {
-        document.getElementById("admin-nav").classList.add("hidden");
+        loginError.textContent = 'Ungültige Daten';
       }
-      showBorrowings();
+    };
+    registerForm.onsubmit = e => {
+      e.preventDefault();
+      const u = document.getElementById('reg-username').value.trim();
+      const p = document.getElementById('reg-password').value;
+      const users = JSON.parse(localStorage.getItem(STORAGE.users));
+      if(users.find(x=>x.username===u)) { registerError.textContent='Nutzer existiert'; return; }
+      const newUser = { username:u, password:p, role:'employee' };
+      users.push(newUser);
+      localStorage.setItem(STORAGE.users, JSON.stringify(users));
+      alert('Registrierung erfolgreich! Bitte einloggen.');
+      hide(regView); show(loginForm);
+    };
+
+    // App nav
+    document.getElementById('logout').onclick = () => {
+      localStorage.removeItem(STORAGE.current);
+      location.reload();
+    };
+    document.getElementById('nav-list').onclick = listBorrowings;
+    document.getElementById('nav-borrow').onclick = borrowForm;
+    document.getElementById('nav-tools').onclick = manageTools;
+
+    // On load: check session
+    window.onload = () => {
+      const s = localStorage.getItem(STORAGE.current);
+      if(s) { currentUser = JSON.parse(s); startApp(); }
+    };
+
+    function startApp() {
+      hide(authView);
+      show(document.getElementById('main-view'));
+      if(currentUser.role==='admin') show(document.getElementById('nav-tools'));
+      listBorrowings();
     }
 
-    // Logout-Funktion
-    function logout() {
-      currentUser = null;
-      localStorage.removeItem(STORAGE_KEYS.currentUser);
-      document.getElementById("main-view").classList.add("hidden");
-      document.getElementById("login-view").classList.remove("hidden");
-      loginForm.reset();
-      document.getElementById("login-error").textContent = "";
-    }
-    document.getElementById("logout-button").addEventListener("click", logout);
-
-    // Anzeige von Meldungen
-    function showMessage(message, type="info") {
-      const msgDiv = document.createElement("div");
-      msgDiv.textContent = message;
-      msgDiv.className = type;
-      document.getElementById("content").prepend(msgDiv);
-      setTimeout(() => { msgDiv.remove(); }, 3000);
-    }
-
-    // Navigation
-    document.getElementById("nav-ausleihen").addEventListener("click", showBorrowings);
-    document.getElementById("nav-ausleihen-form").addEventListener("click", showBorrowToolForm);
-    document.getElementById("nav-admin").addEventListener("click", showAdminDashboard);
-
-    // Ansicht: Liste der Ausleihen (für Mitarbeiter bzw. Admin)
-    function showBorrowings() {
-      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
-      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
-      let filtered;
-      if(currentUser.role === "admin"){
-        filtered = borrowings;
-      } else {
-        filtered = borrowings.filter(b => b.employee === currentUser.username);
-      }
-      let html = "<h2>Ausleihen</h2>";
-      if(filtered.length === 0){
-        html += "<p>Keine Ausleihen gefunden.</p>";
-      } else {
-        html += "<table><tr><th>ID</th><th>Werkzeug</th><th>Mitarbeiter</th><th>Ausleihdatum</th><th>Rückgabedatum</th><th>Defekt</th><th>Aktion</th></tr>";
-        filtered.forEach(b => {
-          const tool = tools.find(t => t.id === b.toolId);
-          html += `<tr>
-                     <td>${b.id}</td>
-                     <td>${tool ? tool.name : "Unbekannt"}</td>
-                     <td>${b.employee}</td>
-                     <td>${new Date(b.borrowDate).toLocaleString()}</td>
-                     <td>${b.returnDate ? new Date(b.returnDate).toLocaleString() : "-"}</td>
-                     <td>${b.defectReport ? b.defectReport : "-"}</td>
-                     <td>`;
-          if(!b.returnDate && (currentUser.role === "admin" || b.employee === currentUser.username)){
-            html += `<button onclick="returnTool(${b.id})">Zurückgeben</button>`;
-          }
-          html += `</td></tr>`;
+    function listBorrowings() {
+      const all = JSON.parse(localStorage.getItem(STORAGE.borrowings));
+      const tools = JSON.parse(localStorage.getItem(STORAGE.tools));
+      const filtered = currentUser.role==='admin'? all : all.filter(b=>b.user===currentUser.username);
+      let html = '<h2>Ausleihen</h2>';
+      if(!filtered.length) html += '<p>Keine Ausleihen.</p>';
+      else {
+        html += '<table><tr><th>#</th><th>Bild</th><th>Tool</th><th>Datum</th><th>Rückgabe</th><th>Defekt</th><th>Aktion</th></tr>';
+        filtered.forEach(b=>{
+          const t = tools.find(x=>x.id===b.toolId);
+          html += `<tr><td>${b.id}</td>`+
+                  `<td>${t.image?`<img src="${t.image}" class="tool-img">`:'-'}</td>`+
+                  `<td>${t.name} (${t.id})</td>`+
+                  `<td>${new Date(b.borrowDate).toLocaleString()}</td>`+
+                  `<td>${b.returnDate?new Date(b.returnDate).toLocaleString():'-'}</td>`+
+                  `<td>${b.defect||'-'}</td>`+
+                  `<td>${!b.returnDate?`<button onclick="returnTool(${b.id})">Zurückgeben</button>`:'-'}</td>`+
+                  '</tr>';
         });
-        html += "</table>";
+        html += '</table>';
       }
-      document.getElementById("content").innerHTML = html;
+      document.getElementById('content').innerHTML = html;
     }
 
-    // Ansicht: Formular zum Ausleihen eines Werkzeugs
-    function showBorrowToolForm() {
-      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
-      if(tools.length === 0){
-        document.getElementById("content").innerHTML = "<p>Keine Werkzeuge verfügbar.</p>";
-        return;
-      }
-      let html = `<h2>Werkzeug ausleihen</h2>
-                  <form id="borrow-form">
-                    <label for="tool-select">Werkzeug:</label>
-                    <select id="tool-select">`;
-      tools.forEach(tool => {
-        html += `<option value="${tool.id}">${tool.name} - ${tool.description}</option>`;
-      });
-      html += `</select><br><br>
-               <label for="defect">Defekt (optional):</label>
-               <textarea id="defect" rows="3"></textarea><br><br>
-               <button type="submit">Ausleihen</button>
-               </form>
-               <div id="form-msg"></div>`;
-      document.getElementById("content").innerHTML = html;
-
-      document.getElementById("borrow-form").addEventListener("submit", function(e) {
+    function borrowForm() {
+      const tools = JSON.parse(localStorage.getItem(STORAGE.tools));
+      let html = '<h2>Werkzeug ausleihen</h2>'+
+                '<form id="borrow-form">'+
+                '<select id="tool-select">';
+      tools.forEach(t=> html+=`<option value="${t.id}">${t.name} (${t.id})</option>`);
+      html += '</select><br><br>'+  
+              '<label>Defekt:</label><textarea id="defect" rows="2"></textarea><br>'+  
+              '<button>Ausleihen</button></form>';
+      document.getElementById('content').innerHTML = html;
+      document.getElementById('borrow-form').onsubmit = e => {
         e.preventDefault();
-        const selectedToolId = parseInt(document.getElementById("tool-select").value);
-        const defect = document.getElementById("defect").value.trim();
-        borrowTool(selectedToolId, defect);
-      });
-    }
-
-    // Werkzeug ausleihen
-    function borrowTool(toolId, defect) {
-      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
-      const newId = borrowings.length > 0 ? Math.max(...borrowings.map(b => b.id)) + 1 : 1;
-      const newBorrowing = {
-        id: newId,
-        toolId: toolId,
-        employee: currentUser.username,
-        borrowDate: new Date().toISOString(),
-        returnDate: null,
-        defectReport: defect
+        const bid = parseInt(document.getElementById('tool-select').value);
+        const def = document.getElementById('defect').value.trim();
+        borrowTool(bid, def);
       };
-      borrowings.push(newBorrowing);
-      localStorage.setItem(STORAGE_KEYS.borrowings, JSON.stringify(borrowings));
-      showMessage("Werkzeug erfolgreich ausgeliehen.", "success");
-      showBorrowings();
+    }
+    function borrowTool(toolId, defect) {
+      const borrowings = JSON.parse(localStorage.getItem(STORAGE.borrowings));
+      const nid = borrowings.length?Math.max(...borrowings.map(x=>x.id))+1:1;
+      borrowings.push({ id:nid, toolId, user:currentUser.username, borrowDate:new Date().toISOString(), returnDate:null, defect });
+      localStorage.setItem(STORAGE.borrowings, JSON.stringify(borrowings));
+      listBorrowings();
+    }
+    function returnTool(id) {
+      const all = JSON.parse(localStorage.getItem(STORAGE.borrowings));
+      const obj = all.find(x=>x.id===id);
+      if(obj) { obj.returnDate=new Date().toISOString(); localStorage.setItem(STORAGE.borrowings, JSON.stringify(all)); }
+      listBorrowings();
     }
 
-    // Werkzeug zurückgeben
-    function returnTool(borrowingId) {
-      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
-      const borrowing = borrowings.find(b => b.id === borrowingId);
-      if(borrowing && !borrowing.returnDate){
-        borrowing.returnDate = new Date().toISOString();
-        localStorage.setItem(STORAGE_KEYS.borrowings, JSON.stringify(borrowings));
-        showMessage("Werkzeug zurückgegeben.", "success");
-        showBorrowings();
-      }
-    }
-
-    // Ansicht: Admin Dashboard
-    function showAdminDashboard() {
-      let html = `<h2>Admin Dashboard</h2>
-        <h3>Werkzeuge verwalten</h3>
-        <div id="tool-management">
-          <form id="add-tool-form">
-            <label for="tool-name">Name:</label>
-            <input type="text" id="tool-name" required>
-            <label for="tool-desc">Beschreibung:</label>
-            <input type="text" id="tool-desc">
-            <button type="submit">Hinzufügen</button>
-          </form>
-          <div id="tool-msg"></div>
-        </div>
-        <div id="tool-list"></div>
-        <h3>Alle Ausleihen</h3>
-        <div id="admin-borrowings"></div>`;
-      document.getElementById("content").innerHTML = html;
-      renderToolList();
-
-      document.getElementById("add-tool-form").addEventListener("submit", function(e){
+    // Admin: manage tools
+    function manageTools() {
+      const tools = JSON.parse(localStorage.getItem(STORAGE.tools));
+      let html = '<h2>Werkzeuge verwalten</h2>'+  
+                 '<form id="add-tool">'+
+                 '<input type="text" id="t-name" placeholder="Name" required>'+  
+                 '<input type="text" id="t-desc" placeholder="Beschreibung">'+
+                 '<input type="file" id="t-img" accept="image/*"><br><br>'+  
+                 '<button>Hinzufügen</button></form>'+  
+                 '<div id="tool-msg"></div>'+
+                 '<table><tr><th>ID</th><th>Bild</th><th>Name</th><th>Beschreibung</th><th>Aktion</th></tr>';
+      tools.forEach(t=> html+=`<tr><td>${t.id}</td>`+
+                             `<td>${t.image?`<img src="${t.image}" class="tool-img">`:'-'}</td>`+
+                             `<td>${t.name}</td><td>${t.description}</td>`+
+                             `<td><button onclick="removeTool(${t.id})">Entfernen</button></td></tr>`);
+      html += '</table>';
+      document.getElementById('content').innerHTML = html;
+      document.getElementById('add-tool').onsubmit = e => {
         e.preventDefault();
-        const name = document.getElementById("tool-name").value.trim();
-        const desc = document.getElementById("tool-desc").value.trim();
-        addTool(name, desc);
-      });
-      renderAdminBorrowings();
-    }
-
-    function renderToolList() {
-      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
-      let html = "<table><tr><th>ID</th><th>Name</th><th>Beschreibung</th><th>Aktion</th></tr>";
-      tools.forEach(tool => {
-        html += `<tr>
-                   <td>${tool.id}</td>
-                   <td>${tool.name}</td>
-                   <td>${tool.description}</td>
-                   <td><button onclick="removeTool(${tool.id})">Entfernen</button></td>
-                 </tr>`;
-      });
-      html += "</table>";
-      document.getElementById("tool-list").innerHTML = html;
-    }
-
-    function addTool(name, description) {
-      if(name === "") return;
-      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
-      const newId = tools.length > 0 ? Math.max(...tools.map(t => t.id)) + 1 : 1;
-      const newTool = { id: newId, name: name, description: description };
-      tools.push(newTool);
-      localStorage.setItem(STORAGE_KEYS.tools, JSON.stringify(tools));
-      document.getElementById("tool-msg").textContent = "Werkzeug hinzugefügt.";
-      renderToolList();
-    }
-
-    function removeTool(id) {
-      let tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
-      tools = tools.filter(t => t.id !== id);
-      localStorage.setItem(STORAGE_KEYS.tools, JSON.stringify(tools));
-      renderToolList();
-      showMessage("Werkzeug entfernt.", "success");
-    }
-
-    function renderAdminBorrowings() {
-      const borrowings = JSON.parse(localStorage.getItem(STORAGE_KEYS.borrowings)) || [];
-      const tools = JSON.parse(localStorage.getItem(STORAGE_KEYS.tools)) || [];
-      if(borrowings.length === 0){
-        document.getElementById("admin-borrowings").innerHTML = "<p>Keine Ausleihen vorhanden.</p>";
-        return;
-      }
-      let html = "<table><tr><th>ID</th><th>Werkzeug</th><th>Mitarbeiter</th><th>Ausleihdatum</th><th>Rückgabedatum</th><th>Defekt</th></tr>";
-      borrowings.forEach(b => {
-        const tool = tools.find(t => t.id === b.toolId);
-        html += `<tr>
-                  <td>${b.id}</td>
-                  <td>${tool ? tool.name : "Unbekannt"}</td>
-                  <td>${b.employee}</td>
-                  <td>${new Date(b.borrowDate).toLocaleString()}</td>
-                  <td>${b.returnDate ? new Date(b.returnDate).toLocaleString() : "-"}</td>
-                  <td>${b.defectReport ? b.defectReport : "-"}</td>
-                </tr>`;
-      });
-      html += "</table>";
-      document.getElementById("admin-borrowings").innerHTML = html;
-    }
-
-    // Prüfe beim Laden, ob bereits ein Benutzer angemeldet ist
-    window.onload = function() {
-      const savedUser = localStorage.getItem(STORAGE_KEYS.currentUser);
-      if(savedUser){
-        currentUser = JSON.parse(savedUser);
-        showMainView();
-      }
+        const name = document.getElementById('t-name').value.trim();
+        const desc = document.getElementById('t-desc').value.trim();
+        const imgInput = document.getElementById('t-img');
+        if(!name) return;
+        const all = JSON.parse(localStorage.getItem(STORAGE.tools));
+        const nid = all.length?Math.max(...all.map(x=>x.id))+1:1;
+        if(imgInput.files && imgInput.files[0]) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            all.push({ id:nid, name, description:desc, image:reader.result });
+            localStorage.setItem(STORAGE.tools, JSON.stringify(all));
+            manageTools();
+          };
+          reader.readAsDataURL(imgInput.files[0]);
+        } else {
+          all.push({ id:nid, name, description:desc, image:'' });
+          localStorage.setItem(STORAGE.tools, JSON.stringify(all));
+          manageTools();
+        }
+      };
     }
   </script>
 </body>
