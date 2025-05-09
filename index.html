@@ -30,8 +30,8 @@
         <input type="password" id="login-password" required>
         <button type="submit">Login</button>
       </form>
-      <p>Noch keinen Account? <button id="show-register">Registrieren</button></p>
       <div id="login-error" class="error"></div>
+      <p>Noch keinen Account? <button id="show-register">Registrieren</button></p>
       <div id="register-view" class="hidden">
         <h2>Registrieren</h2>
         <form id="register-form">
@@ -72,10 +72,18 @@
 
     // Initialize storage with default admin and sample tools
     function initStorage() {
-      if (!localStorage.getItem(STORAGE.users)) {
-        const admin = { username: 'admin', password: 'admin', role: 'admin' };
-        localStorage.setItem(STORAGE.users, JSON.stringify([admin]));
+      const adminUser = { username: 'admin', password: 'admin', role: 'admin' };
+      let users = JSON.parse(localStorage.getItem(STORAGE.users));
+      if (!users) {
+        users = [adminUser];
+      } else {
+        // Ensure admin always exists
+        if (!users.find(u => u.username === 'admin')) {
+          users.unshift(adminUser);
+        }
       }
+      localStorage.setItem(STORAGE.users, JSON.stringify(users));
+
       if (!localStorage.getItem(STORAGE.tools)) {
         const sample = [
           { id:1, name:'Hammer', description:'Robuster Hammer', image:'' },
@@ -109,27 +117,44 @@
     const loginError = document.getElementById('login-error');
     const registerError = document.getElementById('register-error');
 
-    regBtn.onclick = () => { hide(loginForm); show(regView); };
+    regBtn.onclick = () => {
+      hide(loginForm);
+      hide(loginError);
+      show(regView);
+    };
 
     loginForm.onsubmit = e => {
       e.preventDefault();
+      loginError.textContent = '';
       const u = document.getElementById('login-username').value.trim();
       const p = document.getElementById('login-password').value;
       const users = JSON.parse(localStorage.getItem(STORAGE.users));
-      const user = users.find(x=>x.username===u && x.password===p);
-      if (user) { currentUser = user; localStorage.setItem(STORAGE.current, JSON.stringify(user)); startApp(); }
-      else loginError.textContent = 'Ungültige Anmeldedaten';
+      const user = users.find(x => x.username === u && x.password === p);
+      if (user) {
+        currentUser = user;
+        localStorage.setItem(STORAGE.current, JSON.stringify(user));
+        startApp();
+      } else {
+        loginError.textContent = 'Ungültige Anmeldedaten';
+      }
     };
+
     registerForm.onsubmit = e => {
       e.preventDefault();
+      registerError.textContent = '';
       const u = document.getElementById('reg-username').value.trim();
       const p = document.getElementById('reg-password').value;
-      const users = JSON.parse(localStorage.getItem(STORAGE.users));
-      if (users.find(x=>x.username===u)) { registerError.textContent='Benutzer existiert'; return; }
-      users.push({ username:u, password:p, role:'employee' });
+      let users = JSON.parse(localStorage.getItem(STORAGE.users));
+      if (users.find(x => x.username === u)) {
+        registerError.textContent = 'Benutzer existiert';
+        return;
+      }
+      const newUser = { username: u, password: p, role: 'employee' };
+      users.push(newUser);
       localStorage.setItem(STORAGE.users, JSON.stringify(users));
       alert('Registrierung erfolgreich. Bitte einloggen.');
-      hide(regView); show(loginForm);
+      show(loginForm);
+      hide(regView);
     };
 
     // Navigation handlers
@@ -140,7 +165,10 @@
     const btnLogout = document.getElementById('logout');
     const content = document.getElementById('content');
 
-    btnLogout.onclick = () => { localStorage.removeItem(STORAGE.current); location.reload(); };
+    btnLogout.onclick = () => {
+      localStorage.removeItem(STORAGE.current);
+      location.reload();
+    };
     btnList.onclick = listBorrowings;
     btnBorrow.onclick = borrowForm;
     btnTools.onclick = manageTools;
@@ -148,13 +176,20 @@
 
     window.onload = () => {
       const saved = localStorage.getItem(STORAGE.current);
-      if (saved) { currentUser = JSON.parse(saved); startApp(); }
+      if (saved) {
+        currentUser = JSON.parse(saved);
+        startApp();
+      }
     };
 
     // Start App
     function startApp() {
-      hide(authView); show(document.getElementById('main-view'));
-      if (currentUser.role==='admin') { show(btnTools); show(btnUsers); }
+      hide(authView);
+      show(document.getElementById('main-view'));
+      if (currentUser.role === 'admin') {
+        show(btnTools);
+        show(btnUsers);
+      }
       listBorrowings();
     }
 
@@ -162,21 +197,21 @@
     function listBorrowings() {
       const all = JSON.parse(localStorage.getItem(STORAGE.borrowings));
       const tools = JSON.parse(localStorage.getItem(STORAGE.tools));
-      const list = currentUser.role==='admin'? all : all.filter(b=>b.user===currentUser.username);
+      const list = currentUser.role === 'admin' ? all : all.filter(b => b.user === currentUser.username);
       let html = '<h2>Ausleihen</h2>';
       if (!list.length) html += '<p>Keine Ausleihen.</p>';
       else {
         html += '<table><tr><th>#</th><th>Bild</th><th>Tool</th><th>Mitarbeiter</th><th>Ausleihdatum</th><th>Rückgabe</th><th>Defekt</th><th>Aktion</th></tr>';
         list.forEach(b => {
-          const t = tools.find(x=>x.id===b.toolId);
-          html += `<tr><td>${b.id}</td>`+
-                  `<td>${t.image?`<img src="${t.image}" class="tool-img">`:'-'}</td>`+
-                  `<td>${t.name} (${t.id})</td>`+
-                  `<td>${b.user}</td>`+
-                  `<td>${new Date(b.borrowDate).toLocaleString()}</td>`+
-                  `<td>${b.returnDate?new Date(b.returnDate).toLocaleString():'-'}</td>`+
-                  `<td>${b.defect||'-'}</td>`+
-                  `<td>${!b.returnDate?`<button onclick="returnTool(${b.id})">Zurückgeben</button>`:'-'}</td></tr>`;
+          const t = tools.find(x => x.id === b.toolId);
+          html += `<tr><td>${b.id}</td>` +
+                  `<td>${t.image ? `<img src="${t.image}" class="tool-img">` : '-'}</td>` +
+                  `<td>${t.name} (${t.id})</td>` +
+                  `<td>${b.user}</td>` +
+                  `<td>${new Date(b.borrowDate).toLocaleString()}</td>` +
+                  `<td>${b.returnDate ? new Date(b.returnDate).toLocaleString() : '-'}</td>` +
+                  `<td>${b.defect || '-'}</td>` +
+                  `<td>${!b.returnDate ? `<button onclick="returnTool(${b.id})">Zurückgeben</button>` : '-'}</td></tr>`;
         });
         html += '</table>';
       }
@@ -185,47 +220,34 @@
     function borrowForm() {
       const tools = JSON.parse(localStorage.getItem(STORAGE.tools));
       let html = '<h2>Werkzeug ausleihen</h2><form id="borrow-form"><select id="tool-select">';
-      tools.forEach(t=> html+=`<option value="${t.id}">${t.name} (${t.id})</option>`);
+      tools.forEach(t => html += `<option value="${t.id}">${t.name} (${t.id})</option>`);
       html += '</select><textarea id="defect" rows="2" placeholder="Defekt (optional)"></textarea><button>Ausleihen</button></form>';
       content.innerHTML = html;
       document.getElementById('borrow-form').onsubmit = e => {
-        e.preventDefault(); const toolId=parseInt(document.getElementById('tool-select').value);
-        const defect=document.getElementById('defect').value.trim();
-        const arr=JSON.parse(localStorage.getItem(STORAGE.borrowings));
-        const nid=arr.length?Math.max(...arr.map(x=>x.id))+1:1;
-        arr.push({ id:nid, toolId, user:currentUser.username, borrowDate:new Date().toISOString(), returnDate:null, defect });
-        localStorage.setItem(STORAGE.borrowings, JSON.stringify(arr)); listBorrowings();
+        e.preventDefault();
+        const toolId = parseInt(document.getElementById('tool-select').value);
+        const defect = document.getElementById('defect').value.trim();
+        const arr = JSON.parse(localStorage.getItem(STORAGE.borrowings));
+        const nid = arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1;
+        arr.push({ id: nid, toolId, user: currentUser.username, borrowDate: new Date().toISOString(), returnDate: null, defect });
+        localStorage.setItem(STORAGE.borrowings, JSON.stringify(arr));
+        listBorrowings();
       };
     }
-    function returnTool(id) { const arr=JSON.parse(localStorage.getItem(STORAGE.borrowings)); const obj=arr.find(x=>x.id===id); if(obj){obj.returnDate=new Date().toISOString(); localStorage.setItem(STORAGE.borrowings, JSON.stringify(arr));} listBorrowings(); }
+    function returnTool(id) {
+      const arr = JSON.parse(localStorage.getItem(STORAGE.borrowings));
+      const obj = arr.find(x => x.id === id);
+      if (obj) {
+        obj.returnDate = new Date().toISOString();
+        localStorage.setItem(STORAGE.borrowings, JSON.stringify(arr));
+      }
+      listBorrowings();
+    }
 
     // Tools management
     function manageTools() {
       const tools = JSON.parse(localStorage.getItem(STORAGE.tools));
-      let html = '<h2>Werkzeuge verwalten</h2><form id="add-tool"><input type="text" id="t-name" placeholder="Name" required>'+
-                 '<input type="text" id="t-desc" placeholder="Beschreibung"><input type="file" id="t-img" accept="image/*"><button>Hinzufügen</button></form>'+
+      let html = '<h2>Werkzeuge verwalten</h2><form id="add-tool"><input type="text" id="t-name" placeholder="Name" required>' +
+                 '<input type="text" id="t-desc" placeholder="Beschreibung"><input type="file" id="t-img" accept="image/*"><button>Hinzufügen</button></form>' +
                  '<table><tr><th>ID</th><th>Bild</th><th>Name</th><th>Beschreibung</th><th>Aktion</th></tr>';
-      tools.forEach(t=> html+=`<tr><td>${t.id}</td><td>${t.image?`<img src="${t.image}" class="tool-img">`:'-'}</td><td>${t.name}</td><td>${t.description}</td><td><button onclick="removeTool(${t.id})">Entfernen</button></td></tr>`);
-      html += '</table>';
-      content.innerHTML = html;
-      document.getElementById('add-tool').onsubmit = e => {
-        e.preventDefault(); const name=document.getElementById('t-name').value.trim(); const desc=document.getElementById('t-desc').value.trim(); const imgIn=document.getElementById('t-img');
-        const arr=JSON.parse(localStorage.getItem(STORAGE.tools)); const nid=arr.length?Math.max(...arr.map(x=>x.id))+1:1;
-        if(imgIn.files[0]){const reader=new FileReader(); reader.onload=()=>{arr.push({id:nid,name,description:desc,image:reader.result}); localStorage.setItem(STORAGE.tools,JSON.stringify(arr)); manageTools();}; reader.readAsDataURL(imgIn.files[0]);}
-        else{arr.push({id:nid,name,description:desc,image:''}); localStorage.setItem(STORAGE.tools,JSON.stringify(arr)); manageTools();}
-      };
-    }
-    function removeTool(id) { let arr=JSON.parse(localStorage.getItem(STORAGE.tools)); arr=arr.filter(x=>x.id!==id); localStorage.setItem(STORAGE.tools,JSON.stringify(arr)); manageTools(); }
-
-    // Users management
-    function manageUsers() {
-      const users = JSON.parse(localStorage.getItem(STORAGE.users));
-      let html = '<h2>Mitarbeiter verwalten</h2><form id="add-user"><input type="text" id="u-name" placeholder="Benutzername" required>'+
-                 '<input type="password" id="u-pass" placeholder="Passwort" required><select id="u-role"><option value="employee">Mitarbeiter</option><option value="admin">Admin</option></select>'+
-                 '<button>Hinzufügen</button></form>'+
-                 '<table><tr><th>Benutzername</th><th>Rolle</th><th>Aktion</th></tr>';
-      users.forEach(u=> html+=`<tr><td>${u.username}</td><td>${u.role}</td><td><button onclick="editUser('${u.username}')">Bearbeiten</button> <button onclick="removeUser('${u.username}')">Entfernen</button></td></tr>`);
-      html += '</table>';
-      content.innerHTML = html;
-      document.getElementById('add-user').onsubmit = e => {
-        e.preventDefault(); const name=document.getElementById('u-name').value.trim(); const pass=document.getElementById('u
+      tools.forEach(t => html += `<tr><td>${t.id}</td><td>${t.image ? `<img src="${t.image}" class="tool-img">` : '-'}`
