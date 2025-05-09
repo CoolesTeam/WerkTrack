@@ -68,15 +68,28 @@
       borrowings: 'wv_borrowings'
     };
 
-    // Initialisierung
-    (function init(){
+    // Lädt zentrale tools.json und speichert in localStorage
+    async function loadToolsData() {
+      try {
+        const resp = await fetch('tools.json', { cache: 'no-cache' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const tools = await resp.json();
+        localStorage.setItem(STORAGE.tools, JSON.stringify(tools));
+        console.log(`🎉 ${tools.length} Werkzeuge geladen`);
+      } catch (err) {
+        console.error('Konnte tools.json nicht laden:', err);
+        localStorage.setItem(STORAGE.tools, JSON.stringify([]));
+      }
+    }
+
+    // Initialisierung: Admin anlegen, Werkzeuge laden, Borrowings init
+    (async function init(){
       let users = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
       if (!users.find(u => u.username === 'admin')) {
         users.push({ username:'admin', password:'admin', role:'admin' });
         localStorage.setItem(STORAGE.users, JSON.stringify(users));
       }
-      if (!localStorage.getItem(STORAGE.tools))
-        localStorage.setItem(STORAGE.tools, JSON.stringify([]));
+      await loadToolsData();
       if (!localStorage.getItem(STORAGE.borrowings))
         localStorage.setItem(STORAGE.borrowings, JSON.stringify([]));
     })();
