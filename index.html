@@ -7,7 +7,6 @@
     body { font-family: Arial, sans-serif; margin: 20px; }
     .hidden { display: none; }
     .error { color: red; }
-    .success { color: green; }
     nav button { margin-right: 10px; }
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
@@ -69,10 +68,10 @@
       borrowings: 'wv_borrowings'
     };
 
-    // Initialisierung: lege Default-Admin und Arrays an
+    // Initialisierung
     (function init(){
       let users = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
-      if (!users.find(u=>u.username==='admin')) {
+      if (!users.find(u => u.username === 'admin')) {
         users.push({ username:'admin', password:'admin', role:'admin' });
         localStorage.setItem(STORAGE.users, JSON.stringify(users));
       }
@@ -100,13 +99,12 @@
     };
 
     // Login
-    const loginForm = document.getElementById('login-form');
-    loginForm.addEventListener('submit', e => {
+    document.getElementById('login-form').addEventListener('submit', e => {
       e.preventDefault();
       const u = document.getElementById('login-username').value.trim();
       const p = document.getElementById('login-password').value;
       const users = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
-      const user = users.find(x => x.username===u && x.password===p);
+      const user = users.find(x => x.username === u && x.password === p);
       if (user) {
         currentUser = user;
         localStorage.setItem(STORAGE.currentUser, JSON.stringify(user));
@@ -116,13 +114,13 @@
       }
     });
 
-    // Registrierung (nur Anlage, nicht Auto-Login)
+    // Registrierung (nur Anlage)
     document.getElementById('register-form').addEventListener('submit', e => {
       e.preventDefault();
       const u = document.getElementById('reg-username').value.trim();
       const p = document.getElementById('reg-password').value;
       let users = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
-      if (users.find(x=>x.username===u)) {
+      if (users.find(x => x.username === u)) {
         document.getElementById('register-msg').textContent = 'Benutzer existiert bereits.';
         return;
       }
@@ -152,7 +150,7 @@
       registerView.classList.add('hidden');
       mainView.classList.remove('hidden');
       document.getElementById('admin-nav')
-        .classList.toggle('hidden', currentUser.role!=='admin');
+        .classList.toggle('hidden', currentUser.role !== 'admin');
       loadBorrowings();
     }
 
@@ -162,30 +160,30 @@
     document.getElementById('nav-admin-users').onclick = showAdminUsers;
     document.getElementById('nav-admin-tools').onclick = showAdminTools;
 
-    // --- Ausleihen anzeigen ---
+    // Ausleihen anzeigen
     function loadBorrowings(){
       const all = JSON.parse(localStorage.getItem(STORAGE.borrowings)) || [];
       const tools = JSON.parse(localStorage.getItem(STORAGE.tools)) || [];
-      const list = currentUser.role==='admin'
+      const list = currentUser.role === 'admin'
         ? all
-        : all.filter(b=>b.employee===currentUser.username);
+        : all.filter(b => b.employee === currentUser.username);
       let html = '<h2>Ausleihen</h2>';
       if (!list.length) html += '<p>Keine Einträge.</p>';
       else {
         html += '<table><tr><th>ID</th><th>Nummer</th><th>Bild</th><th>Name</th>'
              + '<th>Mitarbeiter</th><th>von</th><th>bis</th><th>Defekt</th><th>Aktion</th></tr>';
-        list.forEach(b=>{
-          const t = tools.find(t=>t.id===b.toolId) || {};
+        list.forEach(b => {
+          const t = tools.find(t => t.id === b.toolId) || {};
           html += `<tr>
             <td>${b.id}</td>
-            <td>${t.number||''}</td>
-            <td>${t.image?`<img src="${t.image}" class="thumb">`:''}</td>
-            <td>${t.name||''}</td>
+            <td>${t.number || ''}</td>
+            <td>${t.image ? `<img src="${t.image}" class="thumb">` : ''}</td>
+            <td>${t.name || ''}</td>
             <td>${b.employee}</td>
             <td>${new Date(b.from).toLocaleString()}</td>
-            <td>${b.to?new Date(b.to).toLocaleString():'-'}</td>
-            <td>${b.defect||'-'}</td>
-            <td>${!b.to?`<button onclick="returnTool(${b.id})">Zurückgeben</button>`:''}</td>
+            <td>${b.to ? new Date(b.to).toLocaleString() : '-'}</td>
+            <td>${b.defect || '-'}</td>
+            <td>${!b.to ? `<button onclick="returnTool(${b.id})">Zurückgeben</button>` : ''}</td>
           </tr>`;
         });
         html += '</table>';
@@ -193,7 +191,7 @@
       document.getElementById('content').innerHTML = html;
     }
 
-    // --- Ausleihen erfassen ---
+    // Ausleihen erfassen
     function showBorrowForm(){
       const tools = JSON.parse(localStorage.getItem(STORAGE.tools)) || [];
       let html = '<h2>Ausleihen erfassen</h2>';
@@ -202,19 +200,18 @@
         html += `<form id="borrow-form">
           <label>Werkzeug:
             <select id="borrow-tool">` +
-            tools.map(t=>`<option value="${t.id}">[#${t.number}] ${t.name}</option>`).join('') +
-            `</select>
-          </label><br><br>
+            tools.map(t => `<option value="${t.id}">[#${t.number}] ${t.name}</option>`).join('') +
+            `</select></label><br><br>
           <label>Defekt (optional):<br><textarea id="borrow-defect" rows="2"></textarea></label><br><br>
           <button type="submit">Speichern</button>
         </form>`;
       }
       document.getElementById('content').innerHTML = html;
       if (tools.length) {
-        document.getElementById('borrow-form').addEventListener('submit', e=>{
+        document.getElementById('borrow-form').addEventListener('submit', e => {
           e.preventDefault();
           let b = JSON.parse(localStorage.getItem(STORAGE.borrowings)) || [];
-          const next = b.length? Math.max(...b.map(x=>x.id))+1 : 1;
+          const next = b.length ? Math.max(...b.map(x => x.id)) + 1 : 1;
           b.push({
             id: next,
             toolId: parseInt(document.getElementById('borrow-tool').value),
@@ -231,7 +228,7 @@
 
     function returnTool(id){
       let b = JSON.parse(localStorage.getItem(STORAGE.borrowings)) || [];
-      const e = b.find(x=>x.id===id);
+      const e = b.find(x => x.id === id);
       if (e) {
         e.to = new Date().toISOString();
         localStorage.setItem(STORAGE.borrowings, JSON.stringify(b));
@@ -239,7 +236,7 @@
       }
     }
 
-    // --- Admin: Mitarbeiter verwalten (korrigiert) ---
+    // Admin: Mitarbeiterverwaltung mit Passwortanzeige
     function showAdminUsers(){
       let users = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
       const content = document.getElementById('content');
@@ -252,12 +249,13 @@
           <button type="submit">Hinzufügen</button>
         </form>
       `;
-      html += '<table><tr><th>Benutzername</th><th>Rolle</th><th>Aktion</th></tr>';
-      users.forEach(u=>{
+      html += '<table><tr><th>Benutzername</th><th>Passwort</th><th>Rolle</th><th>Aktion</th></tr>';
+      users.forEach(u => {
         html += `<tr>
           <td>${u.username}</td>
+          <td>${u.password}</td>
           <td>${u.role}</td>
-          <td>${u.username!=='admin'
+          <td>${u.username !== 'admin'
             ? `<button class="delete-user" data-username="${u.username}">Löschen</button>`
             : '—'}</td>
         </tr>`;
@@ -265,39 +263,36 @@
       html += '</table>';
       content.innerHTML = html;
 
-      // Hinzufügen neuer Nutzer
-      document.getElementById('add-user-form')
-        .addEventListener('submit', e=>{
-          e.preventDefault();
-          const nu = document.getElementById('new-username').value.trim();
-          const np = document.getElementById('new-password').value;
-          let us = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
-          if (us.find(x=>x.username===nu)) {
-            return alert('Benutzer existiert bereits.');
-          }
-          us.push({ username: nu, password: np, role:'employee' });
-          localStorage.setItem(STORAGE.users, JSON.stringify(us));
-          showAdminUsers();
-        });
+      document.getElementById('add-user-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const nu = document.getElementById('new-username').value.trim();
+        const np = document.getElementById('new-password').value;
+        let us = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
+        if (us.find(x => x.username === nu)) {
+          return alert('Benutzer existiert bereits.');
+        }
+        us.push({ username: nu, password: np, role:'employee' });
+        localStorage.setItem(STORAGE.users, JSON.stringify(us));
+        showAdminUsers();
+      });
 
-      // Löschen existierender Nutzer
-      content.querySelectorAll('.delete-user').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
+      content.querySelectorAll('.delete-user').forEach(btn => {
+        btn.addEventListener('click', () => {
           const name = btn.dataset.username;
           if (!confirm(`Benutzer "${name}" wirklich löschen?`)) return;
           let us = JSON.parse(localStorage.getItem(STORAGE.users)) || [];
-          us = us.filter(u=>u.username!==name);
+          us = us.filter(u => u.username !== name);
           localStorage.setItem(STORAGE.users, JSON.stringify(us));
           showAdminUsers();
         });
       });
     }
 
-    // --- Admin: Werkzeuge verwalten ---
+    // Admin: Werkzeuge verwalten
     function showAdminTools(){
       let tools = JSON.parse(localStorage.getItem(STORAGE.tools)) || [];
       let html = '<h2>Werkzeugverwaltung</h2>';
-      html += `<form id="add-tool" enctype="multipart/form-data">
+      html += `<form id="add-tool">
         <label>Nummer:
           <input type="text" id="tool-number" required maxlength="20"
                  pattern="[A-Za-z0-9]{1,20}"
@@ -310,11 +305,11 @@
       </form>`;
       html += '<table><tr><th>ID</th><th>Nummer</th><th>Bild</th><th>Name</th>'
            + '<th>Beschreibung</th><th>Aktion</th></tr>';
-      tools.forEach(t=>{
+      tools.forEach(t => {
         html += `<tr>
           <td>${t.id}</td>
           <td>${t.number}</td>
-          <td>${t.image?`<img src="${t.image}" class="thumb">`:''}</td>
+          <td>${t.image ? `<img src="${t.image}" class="thumb">` : ''}</td>
           <td>${t.name}</td>
           <td>${t.description}</td>
           <td><button onclick="deleteTool(${t.id})">Löschen</button></td>
@@ -323,7 +318,7 @@
       html += '</table>';
       document.getElementById('content').innerHTML = html;
 
-      document.getElementById('add-tool').addEventListener('submit', async e=>{
+      document.getElementById('add-tool').addEventListener('submit', async e => {
         e.preventDefault();
         const num  = document.getElementById('tool-number').value.trim();
         const name = document.getElementById('tool-name').value.trim();
@@ -331,14 +326,14 @@
         const file = document.getElementById('tool-image').files[0];
         let img = null;
         if (file) {
-          img = await new Promise(r=>{
+          img = await new Promise(r => {
             const fr = new FileReader();
-            fr.onload = ()=>r(fr.result);
+            fr.onload = () => r(fr.result);
             fr.readAsDataURL(file);
           });
         }
         let arr = JSON.parse(localStorage.getItem(STORAGE.tools)) || [];
-        const next = arr.length? Math.max(...arr.map(x=>x.id))+1 : 1;
+        const next = arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1;
         arr.push({ id: next, number: num, name, description: desc, image: img });
         localStorage.setItem(STORAGE.tools, JSON.stringify(arr));
         showAdminTools();
@@ -348,19 +343,19 @@
     function deleteTool(id){
       if (!confirm(`Werkzeug #${id} wirklich löschen?`)) return;
       let arr = JSON.parse(localStorage.getItem(STORAGE.tools)) || [];
-      arr = arr.filter(t=>t.id!==id);
+      arr = arr.filter(t => t.id !== id);
       localStorage.setItem(STORAGE.tools, JSON.stringify(arr));
       showAdminTools();
     }
 
-    // Autologin, falls bereits eingeloggt
+    // Autologin
     const saved = localStorage.getItem(STORAGE.currentUser);
     if (saved) {
       currentUser = JSON.parse(saved);
       showMain();
     }
 
-  });  
+  });
   </script>
 </body>
 </html>
