@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "number": "A001",
+    "name": "Hammer",
+    "description": "Robuster Schlosserhammer",
+    "image": null
+  },
+  {
+    "id": 2,
+    "number": "B123",
+    "name": "Schraubenzieher",
+    "description": "Kreuzschlitz PH2",
+    "image": null
+  },
+  … und so weiter für alle 1000 Werkzeuge …
+]
